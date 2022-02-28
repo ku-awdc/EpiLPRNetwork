@@ -9,4 +9,4 @@ calculate_risk <- function(new_admission, new_discharge, new_type, old_admission
   )
 }
 
-results <- get_edges(all_by = c("00","01","03"), risk_function = calculate_risk, testing=TRUE)
+results <- get_edges(all_by = c("00","01","03"), risk_function = calculate_risk, testing=FALSE)

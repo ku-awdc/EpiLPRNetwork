@@ -55,6 +55,9 @@ get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_functio
   }
 
 
+  cl <- parallel::makeCluster(getOption("cl.cores", 10))
+  parallel::clusterEvalQ(cl, {library(tidyverse)})
+
   # Note: output of this is cumulative!
   cat("Looping over", length(all_by), "birth years..\n")
   for(by in all_by){
@@ -95,8 +98,9 @@ get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_functio
     trisk <- trisk %>%
       ## TODO: replace with parallel::mclapply on a non-laptop
       ## TODO: replace with a C++ function
-      pbapply::pblapply(function(x){
-        x %>%
+      # pbapply::pblapply(function(x){
+      parallel::parLapply(cl, X=., fun=function(x){
+          x %>%
           select(OldHospital=HospitalID, OldAdmission=Admission, OldDischarge=Discharge, OldType=Type) %>%
           full_join(x %>% mutate(Event=1:n()), by=character(0)) %>%
           filter(Admission >= OldDischarge, HospitalID!=OldHospital) %>%
