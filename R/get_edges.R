@@ -55,7 +55,7 @@ get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_functio
   }
 
 
-  cl <- parallel::makeCluster(getOption("cl.cores", 10))
+  cl <- parallel::makeCluster(10)  #getOption("cl.cores", 10))
   parallel::clusterEvalQ(cl, {library(tidyverse)})
 
   # Note: output of this is cumulative!
