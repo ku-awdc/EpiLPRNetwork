@@ -145,6 +145,7 @@ get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_functio
 
   }
 
+  close(cl)
   cat("Done\n")
 
   return(list(risk=allrisk, hospital=allhosp))
