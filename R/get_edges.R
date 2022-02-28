@@ -93,7 +93,6 @@ get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_functio
       trisk <- trisk[1:100]
     }
     trisk <- trisk %>%
-      magrittr::extract(1:10) %>%
       ## TODO: replace with parallel::mclapply on a non-laptop
       ## TODO: replace with a C++ function
       pbapply::pblapply(function(x){
