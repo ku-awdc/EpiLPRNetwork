@@ -2,6 +2,9 @@
 
 export(get_edges)
 export(get_sql_table)
+export(patient_risk)
 import(RODBC)
+import(Rcpp)
 import(keyring)
 import(odbc)
+useDynLib(EpiLPRNetwork, .registration = TRUE)

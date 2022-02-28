@@ -4,7 +4,11 @@
 \alias{get_edges}
 \title{Title}
 \usage{
-get_edges(risk_function = NULL)
+get_edges(
+  all_by = str_replace(format(0:99), " ", "0"),
+  risk_function = NULL,
+  testing = FALSE
+)
 }
 \description{
 Title
