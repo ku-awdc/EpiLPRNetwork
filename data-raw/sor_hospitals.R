@@ -30,6 +30,11 @@ contacts %>%
   arrange(desc(n)) ->
   sor_frq
 
+### Add any that we had previously but have now disappeared:
+data(sor_hospitals)
+sor_frq <- full_join(sor_frq, sor_hospitals %>% select(unit_SOR), by="unit_SOR")
+
+
 ### Then extract relevant information from the database:
 sor_db <- sor %>%
   select(unit_SOR = SorIdentifier, OwnerType_db=IE_ejerforhold, UnitName_db = Enhedsnavn, SundhedsinstitutionNavn_db = Sundhedsinstitution, Latitude_db = Latitude, Longitude_db = Longitude, OphoertDato, FraDato, Region = Region) %>%
@@ -239,10 +244,12 @@ final_hospital <- sor_hospitals %>%
 
 ## TODO: add unit type e.g. OutPatient, InPatient, Radiology, or by Speciality, or something:
 sor_hospitals <- sor_hospitals %>%
-  mutate(Type = "Unknown")
+  mutate(Type = "Unknown") %>%
+  mutate(HospitalName = HospitalID) %>%
+  mutate(HospitalID = as.integer(factor(HospitalName)), HospitalID = str_c("Hospital_", str_replace_all(format(HospitalID), " ", "0")))
 
-if(FALSE){
-  writexl::write_xlsx(list(sor_hospitals=sor_hospitals, final_hospital=final_hospital), "G:/PhD/Sygehus klassifikation/sor_hospitals.xlsx")
+if(TRUE){
+  writexl::write_xlsx(list(sor_hospitals=sor_hospitals, final_hospital=final_hospital), str_c("G:/PhD/Sygehus klassifikation/sor_hospitals_", strftime(Sys.Date(), "%Y%m%d"), ".xlsx"))
 }
 
 

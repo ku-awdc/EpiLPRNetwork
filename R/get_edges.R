@@ -1,27 +1,35 @@
 #' Title
 #'
 #' @export
-get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_function = NULL, testing=FALSE){
+get_edges <- function(all_by = str_replace(format(00:16), " ", "0"), risk_function = NULL, output_level = "month"){
 
   data(sor_hospitals)
+
+  stopifnot(output_level %in% c("month","day"))
 
   ## Check there aren't new SOR codes:
   cat("Checking SOR codes in epiLPR...\n")
   contacts <- get_sql_table("contacts")
   contacts %>%
-    filter(contact_in<"2022-01-02 00:00") %>%
+    filter(contact_in<"2021-01-01 00:00") %>%
     count(unit_SOR) %>%
     collect() %>%
     identity() %>%
     arrange(desc(n)) ->
     sor_frq
+
+  # Tolerate a small number of new error SOR:
+  problems <- sor_frq %>% filter(!unit_SOR %in% sor_hospitals$unit_SOR)
+  if(nrow(problems)>0L){
+    stop("There are new SOR: re-run data-raw/sor_hospitals and reinstall/load the package")
+  }
   stopifnot(all(sor_frq$unit_SOR %in% sor_hospitals$unit_SOR))
 
 
   if(is.null(risk_function)){
     # Function to relate hospitalisation risk based on delta time:
     # Note: should be vectorised!!!
-    calculate_risk <- function(new_admission, new_discharge, new_type, old_admission, old_discharge, old_type){
+    calculate_risk <- function(new_admission, new_discharge, new_type, old_admission, old_discharge, old_type, birth_year){
       case_when(
         as.numeric(new_admission-old_discharge, units="days") > 30 ~ 0.0,
         TRUE ~ 1
@@ -54,9 +62,6 @@ get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_functio
   str_subset(c(1111,"5657","1dv","dv2"), ".*[^[:digit:]].*")
   }
 
-
-  cl <- parallel::makeCluster(10)  #getOption("cl.cores", 10))
-  parallel::clusterEvalQ(cl, {library(tidyverse)})
 
   # Note: output of this is cumulative!
   cat("Looping over", length(all_by), "birth years..\n")
@@ -91,61 +96,107 @@ get_edges <- function(all_by = str_replace(format(0:99), " ", "0"), risk_functio
     ## Calculate connection strength between different hospitals for the same patient:
     trisk <- admissions_using %>%
       arrange(cprnr, Admission) %>%
-      split(.$cprnr)
-    if(testing){
-      trisk <- trisk[1:100]
-    }
-    trisk <- trisk %>%
+      mutate(cprnr = as.integer(factor(cprnr)) -1L)
+
+    trisk <- EpiLPRNetwork:::Rcpp_patient_risk(trisk) %>%
+      filter(HospitalID!=OldHospital)
+
+    # Equivalent but slower:
+    if(FALSE){
+    trisk2 <- trisk %>%
       ## TODO: replace with parallel::mclapply on a non-laptop
       ## TODO: replace with a C++ function
       # pbapply::pblapply(function(x){
-      parallel::parLapply(cl, X=., fun=function(x){
-          x %>%
+      lapply(function(x){
+        x %>%
           select(OldHospital=HospitalID, OldAdmission=Admission, OldDischarge=Discharge, OldType=Type) %>%
           full_join(x %>% mutate(Event=1:n()), by=character(0)) %>%
-          filter(Admission >= OldDischarge, HospitalID!=OldHospital) %>%
-          # filter(Admission > OldAdmission, HospitalID!=OldHospital) %>%
-          mutate(Risk = calculate_risk(Admission, Discharge, Type, OldAdmission, OldDischarge, OldType)) %>%
-          mutate(Admission = as.Date(Admission, tz="Europe/Copenhagen")) %>%
-          group_by(Admission, Event, HospitalID, OldHospital) %>%
-          summarise(TotalRisk = sum(Risk), .groups='drop') %>%
-          filter(TotalRisk > 0.0) %>%
-          select(Admission, HospitalTo=HospitalID, HospitalFrom=OldHospital, TotalRisk)
-      })
+          filter(Admission >= OldAdmission, HospitalID!=OldHospital)
+      }) %>% bind_rows()
+    }
 
-    ## Calculate patient days in hospital:
-    thosp <- admissions_using %>%
-      mutate(AdmissionHours = as.numeric(Discharge - Admission, units="hours")) %>%
-      mutate(AdmissionNights = as.numeric(as.Date(Discharge)-as.Date(Admission), units="days")) %>%
-      mutate(OvernightAdmissions = as.numeric(as.Date(Discharge)-as.Date(Admission), units="days") > 0) %>%
-      mutate(MonthYear = strftime(Admission, "%Y-%m")) %>%
-      group_by(HospitalID, MonthYear) %>%
-      summarise(TotalAdmissions = n(), AdmissionHours = sum(AdmissionHours),
-                AdmissionNights = sum(AdmissionNights), OvernightAdmissions = sum(OvernightAdmissions),
-                TotalPatients = length(unique(cprnr)),  .groups="drop")
+    if(output_level=="month"){
 
+      trisk <- trisk %>%
+        mutate(Risk = calculate_risk(Admission, Discharge, Type, OldAdmission, OldDischarge, OldType, as.numeric(str_sub(cprnr, start=5L, end=6L)))) %>%
+        mutate(MonthYear = strftime(Admission, "%Y-%m")) %>%
+        group_by(MonthYear, HospitalID, OldHospital) %>%
+        summarise(TotalRisk = sum(Risk), .groups='drop') %>%
+        filter(TotalRisk > 0.0) %>%
+        select(MonthYear, HospitalTo=HospitalID, HospitalFrom=OldHospital, TotalRisk)
+
+      ## Calculate patient days in hospital:
+      thosp <- admissions_using %>%
+        mutate(AdmissionHours = as.numeric(Discharge - Admission, units="hours")) %>%
+        mutate(AdmissionNights = as.numeric(as.Date(Discharge)-as.Date(Admission), units="days")) %>%
+        mutate(OvernightAdmissions = as.numeric(as.Date(Discharge)-as.Date(Admission), units="days") > 0) %>%
+        mutate(MonthYear = strftime(Admission, "%Y-%m")) %>%
+        group_by(HospitalID, MonthYear) %>%
+        summarise(TotalAdmissions = n(), AdmissionHours = sum(AdmissionHours),
+                  AdmissionNights = sum(AdmissionNights), OvernightAdmissions = sum(OvernightAdmissions),
+                  TotalPatients = length(unique(cprnr)),  .groups="drop")
+
+    }else if(output_level=="day"){
+
+      trisk <- trisk %>%
+        mutate(Risk = calculate_risk(Admission, Discharge, Type, OldAdmission, OldDischarge, OldType, as.numeric(str_sub(cprnr, start=5L, end=6L)))) %>%
+        mutate(Admission = as.Date(Admission, tz="Europe/Copenhagen")) %>%
+        group_by(Admission, HospitalID, OldHospital) %>%
+        summarise(TotalRisk = sum(Risk), .groups='drop') %>%
+        filter(TotalRisk > 0.0) %>%
+        select(Admission, HospitalTo=HospitalID, HospitalFrom=OldHospital, TotalRisk)
+
+      ## Calculate patient days in hospital:
+      thosp <- admissions_using %>%
+        mutate(AdmissionHours = as.numeric(Discharge - Admission, units="hours")) %>%
+        mutate(AdmissionNights = as.numeric(as.Date(Discharge)-as.Date(Admission), units="days")) %>%
+        mutate(OvernightAdmissions = as.numeric(as.Date(Discharge)-as.Date(Admission), units="days") > 0) %>%
+        mutate(Admission = as.Date(Admission, tz="Europe/Copenhagen")) %>%
+        group_by(HospitalID, Admission) %>%
+        summarise(TotalAdmissions = n(), AdmissionHours = sum(AdmissionHours),
+                  AdmissionNights = sum(AdmissionNights), OvernightAdmissions = sum(OvernightAdmissions),
+                  TotalPatients = length(unique(cprnr)),  .groups="drop")
+
+    }else{
+      stop("Unrecognised output_level")
+    }
 
     if(by==all_by[1]){
-      allrisk <- trisk %>% bind_rows()
+      allrisk <- trisk
       allhosp <- thosp
     }else{
-      # allrisk <- bind_rows(allrisk, trisk)
-      allrisk <- c(list(allrisk), trisk) %>% bind_rows()
+      allrisk <- bind_rows(allrisk, trisk)
       allhosp <- bind_rows(allhosp, thosp)
     }
 
-    allrisk <- allrisk %>%
-      group_by(Admission, HospitalTo, HospitalFrom) %>%
-      summarise(TotalRisk = sum(TotalRisk), .groups='drop')
+    if(output_level=="month"){
 
-    allhosp <- allhosp %>%
-      group_by(HospitalID, MonthYear) %>%
-      # summarise(across(where(is.numeric), sum), .groups="drop")
-      summarise_if(is.numeric, sum)
+      allrisk <- allrisk %>%
+        group_by(MonthYear, HospitalTo, HospitalFrom) %>%
+        summarise(TotalRisk = sum(TotalRisk), .groups='drop')
+
+      allhosp <- allhosp %>%
+        group_by(HospitalID, MonthYear) %>%
+        # summarise(across(where(is.numeric), sum), .groups="drop")
+        summarise_if(is.numeric, sum)
+
+    }else if(output_level=="day"){
+
+      allrisk <- allrisk %>%
+        group_by(Admission, HospitalTo, HospitalFrom) %>%
+        summarise(TotalRisk = sum(TotalRisk), .groups='drop')
+
+      allhosp <- allhosp %>%
+        group_by(HospitalID, Admission) %>%
+        # summarise(across(where(is.numeric), sum), .groups="drop")
+        summarise_if(is.numeric, sum)
+
+    }else{
+      stop("Unrecognised output_level")
+    }
 
   }
 
-  close(cl)
   cat("Done\n")
 
   return(list(risk=allrisk, hospital=allhosp))

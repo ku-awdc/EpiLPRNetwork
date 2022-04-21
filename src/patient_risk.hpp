@@ -1,4 +1,3 @@
 #include <Rcpp.h>
-using namespace Rcpp;
 
-DataFrame patient_risk();
+Rcpp::DataFrame patient_risk(const Rcpp::DataFrame& input);

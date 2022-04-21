@@ -40,3 +40,4 @@ get_sql_table <- function(table_name){
   return(tbl)
 
 }
+

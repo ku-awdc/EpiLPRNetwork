@@ -8,3 +8,4 @@
 #' @useDynLib EpiLPRNetwork, .registration = TRUE
 ## usethis namespace: end
 NULL
+
