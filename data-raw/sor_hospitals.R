@@ -23,7 +23,7 @@ if(!file.exists(missing_region_file)) stop("missing_region file not found")
 
 ### First extract all SOR used in contacts:
 contacts %>%
-  filter(contact_in<"2022-01-02 00:00") %>%
+  filter(contact_in<"2019-01-01 00:00") %>%
   count(unit_SOR) %>%
   collect() %>%
   identity() %>%
@@ -69,7 +69,7 @@ NoGIScsv <- readxl::read_excel(NoGIScsv_file, na=c("", "NA")) %>%
   mutate(Easting = st_coordinates(geometry)[,1], Northing = st_coordinates(geometry)[,2]) %>%
   as_tibble() %>%
   select(-geometry) %>%
-  right_join(sor_frq, by="unit_SOR")
+  full_join(sor_frq, by="unit_SOR")
 NoGIScsv <- NoGIScsv[!duplicated(NoGIScsv[c("unit_SOR","Easting","Northing")]),]
 with(NoGIScsv %>% count(unit_SOR) %>% count(n, name="nn"), stopifnot(all(n==1)))
 with(NoGIScsv, range(Easting, na.rm=TRUE))
@@ -206,6 +206,7 @@ SORbytype %>%
       )
     }
     x %>%
+      mutate(Easting_use = Easting, Northing_use=Northing)%>%
       st_as_sf(coords=c("Northing","Easting")) %>%
       st_set_crs(25832) %>%
       st_transform("WGS84") %>%
@@ -224,7 +225,7 @@ stopifnot(all(finalSOR$unit_SOR %in% sor_db$unit_SOR))
 
 sor_hospitals <- finalSOR %>%
   as_tibble() %>%
-  select(unit_SOR, Region, OwnerType, HospitalID, Latitude, Longitude)
+  select(unit_SOR, Region, OwnerType, HospitalID, Latitude, Longitude, Easting_use, Northing_use)
 
 # writexl::write_xlsx(list(missing_region = sor_hospitals %>% filter(is.na(Region) | is.na(OwnerType))), missing_region_file)
 ## TODO: fix missing region and ownertype
@@ -254,3 +255,4 @@ if(TRUE){
 
 
 usethis::use_data(sor_hospitals, overwrite = TRUE)
+

@@ -2,6 +2,8 @@
 
 #include "patient_risk.hpp"
 
+// TODO:^logical argument to either eturn all combinations or just those where it is not the same hospital
+
 Rcpp::DataFrame patient_risk(const Rcpp::DataFrame& input)
 {
   using namespace Rcpp;
