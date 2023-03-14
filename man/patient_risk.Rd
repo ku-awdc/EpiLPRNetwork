@@ -4,7 +4,10 @@
 \alias{patient_risk}
 \title{Wrapper for C++ function of patient transfer risk}
 \usage{
-patient_risk()
+patient_risk(trisk, within_hosp = FALSE)
+}
+\arguments{
+\item{within_hosp}{}
 }
 \description{
 Wrapper for C++ function of patient transfer risk

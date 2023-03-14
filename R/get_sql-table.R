@@ -10,14 +10,27 @@
 get_sql_table <- function(table_name){
 
   # Only needs to be run once:
-  # key_set_with_value("Dias_SQL_epiLPR", username="*driver string for epiLPR*", password=getPass::getPass())
-  # key_set_with_value("Dias_SQL_IBSOR", username="*driver string for IB_SOR*", password=getPass::getPass())
-  cstring <- key_list("Dias_SQL_epiLPR")[,"username"]
-  stopifnot(length(cstring)==1)
-  conn <- DBI::dbConnect(odbc::odbc(), .connection_string=str_c(cstring, key_get("Dias_SQL_epiLPR", username=cstring)), encoding="UTF-8")
-  cstring <- key_list("Dias_SQL_IBSOR")[,"username"]
-  stopifnot(length(cstring)==1)
-  conn_sor <- DBI::dbConnect(odbc::odbc(), .connection_string=str_c(cstring, key_get("Dias_SQL_IBSOR", username=cstring)), encoding="latin1")
+  if(FALSE){
+
+    keyring::key_set_with_value("Dias_SQL_epiLPR", username="*driver string for epiLPR*", password=getPass::getPass())
+    keyring::key_set_with_value("Dias_SQL_IBSOR", username="*driver string for IB_SOR*", password=getPass::getPass())
+  }
+  #key_set_with_value("Dias_SQL_epiLPR", username="*driver string for epiLPR*", password=getPass::getPass())
+  #key_set_with_value("Dias_SQL_IBSOR", username="*driver string for IB_SOR*", password=getPass::getPass())
+  #Paste this into "*driverstring ^^
+  #NB:username is driver string, should start with driver={SQL Server}; ... and end with ... UID=XXXX;
+
+  # See above for note on format of this cstring:
+  cstring <- keyring::key_list("Dias_SQL_epiLPR")[,"username"]
+  if(length(cstring)!=1) stop("The keyring store has more than (or fewer than) 1 record for Dias_SQL_epiLPR - this needs fixing in the keyring registry")
+  conn <- DBI::dbConnect(odbc::odbc(), .connection_string=stringr::str_c(cstring, "PWD=", keyring::key_get("Dias_SQL_epiLPR", username=cstring)), encoding="UTF-8")
+  # NOTE: this should NOT work but apparently does:
+  # conn <- DBI::dbConnect(odbc::odbc(), .connection_string=cstring, encoding="UTF-8")
+
+  # See above for note on format of this cstring:
+  cstring <- keyring::key_list("Dias_SQL_IBSOR")[,"username"]
+  if(length(cstring)!=1) stop("The keyring store has more than (or fewer than) 1 record for Dias_SQL_IBSOR - this needs fixing in the keyring registry")
+  conn_sor <- DBI::dbConnect(odbc::odbc(), .connection_string=stringr::str_c(cstring, keyring::key_get("Dias_SQL_IBSOR", username=cstring)), encoding="latin1")
 
   if(table_name=="contacts"){
     tbl <- tbl(conn, dbplyr::in_schema("EpiLPR3", "data_contacts"))
