@@ -190,8 +190,7 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, risk_function = NULL, ou
 
     ## Calculate connection strength between different hospitals for the same patient:
     trisk <- admissions_using %>%
-      arrange(cprnr, Admission) %>%
-      mutate(cprnr = as.integer(factor(cprnr)) -1L)
+      arrange(cprnr, Admission)
 
     ## These should be equivalent:
     if(FALSE){
@@ -207,7 +206,7 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, risk_function = NULL, ou
       stopifnot(nrow(trisk2)==nrow(trisk3))
     }
 
-    trisk <- EpiLPRNetwork:::Rcpp_patient_risk(trisk, within_hosp=FALSE)
+    trisk <- patient_risk(trisk, within_hosp=FALSE)
     stopifnot(all(!is.na(trisk$OldHospital)), all(!is.na(trisk$HospitalID)))
 
     # Equivalent but slower:

@@ -5,9 +5,13 @@
 \title{Title}
 \usage{
 get_edges(
-  all_by = str_replace(format(0:99), " ", "0"),
+  all_by_mth = NA,
+  year_group = TRUE,
   risk_function = NULL,
-  testing = FALSE
+  output_level = "month",
+  max_date = "2019-01-01 00:00",
+  retry = Inf,
+  timeout = c(1, 5, 15, 60)
 )
 }
 \description{
