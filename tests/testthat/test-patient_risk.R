@@ -36,7 +36,7 @@ test_that("function runs", {
 })
 
 # Compare to R code version:
-within_R <- patient_risk_R(df) |> arrange(cprnr, OldHospital, OldAdmission, OldDischarge, HospitalID, Admission)
+within_R <- EpiLPRNetwork:::patient_risk_R(df) |> arrange(cprnr, OldHospital, OldAdmission, OldDischarge, HospitalID, Admission)
 between_hosp <- between_hosp |> arrange(cprnr, OldHospital, OldAdmission, OldDischarge, HospitalID, Admission)
 within_hosp <- within_hosp |> arrange(cprnr, OldHospital, OldAdmission, OldDischarge, HospitalID, Admission)
 
