@@ -280,7 +280,8 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, risk_function = NULL, ou
     allhosp <- allhosp %>%
       group_by(TimeUnit, HospitalID, Type) %>%
       # summarise(across(where(is.numeric), sum), .groups="drop")
-      summarise_if(is.numeric, sum, .groups="drop")
+      summarise_if(is.numeric, sum) %>%
+      ungroup()
 
     cat(" finished in ", round(as.numeric(Sys.time()-st, units="mins"), 1), " minutes.\n", sep="")
 
