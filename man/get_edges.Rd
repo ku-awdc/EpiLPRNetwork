@@ -11,7 +11,8 @@ get_edges(
   output_level = "month",
   max_date = "2019-01-01 00:00",
   retry = Inf,
-  timeout = c(1, 5, 15, 60)
+  timeout = c(1, 5, 15, 60),
+  testing = FALSE
 )
 }
 \description{

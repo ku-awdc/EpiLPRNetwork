@@ -71,7 +71,7 @@ Rcpp::DataFrame patient_risk_template(const Rcpp::DataFrame& input)
   {
     int rowstart = 0L;
     totalrows = 0L;
-    for(int cpr = 0L; cpr < ncprs; ++cpr)
+    for(size_t cpr = 0L; cpr < ncprs; ++cpr)
     {
       for(int first = 0L; first < cpr_counts[cpr]; ++first)
       {

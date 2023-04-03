@@ -21,6 +21,30 @@ if(!file.exists(manual_hospital_file)) stop("manual_hospital file not found")
 missing_region_file <- "G:/PhD/Sygehus klassifikation/Nyeste SOR/missing_region.xlsx"
 if(!file.exists(missing_region_file)) stop("missing_region file not found")
 
+
+### Somatic vs psych:
+sor_type <- sor %>%
+  select(unit_SOR = SorIdentifier, Enhedsnavn, Klinisk_speciale) %>%
+  collect() %>%
+  mutate(unit_SOR = as.character(unit_SOR)) %>%
+  mutate(psyk_navn = case_when(
+    str_detect(str_to_lower(Enhedsnavn), "psyk") ~ "psyk_in_name",
+    TRUE ~ "other_name"
+  )) %>%
+  mutate(psyk_speciale = case_when(
+    is.na(Klinisk_speciale) ~ "missing_specialism",
+    Klinisk_speciale %in% c("børne- og ungdomspsykiatri", "psykiatri") ~ "psyk_specialism",
+    TRUE ~ "other_specialism"
+  )) %>%
+  mutate(Type = case_when(
+    psyk_speciale == "psyk_specialism" ~ "psykiatrisk",
+    psyk_navn == "psyk_in_name" ~ "psykiatrisk",
+    TRUE ~ "somatisk"
+  ))
+
+sor_type %>% filter(psyk_navn=="psyk_in_name", psyk_speciale=="other_specialism") %>% print(n=Inf)
+sor_type %>% count(Type, psyk_navn, psyk_speciale)
+
 ### First extract all SOR used in contacts:
 contacts %>%
   filter(contact_in<"2019-01-01 00:00") %>%
@@ -32,7 +56,10 @@ contacts %>%
 
 ### Add any that we had previously but have now disappeared:
 data(sor_hospitals)
-sor_frq <- full_join(sor_frq, sor_hospitals %>% select(unit_SOR), by="unit_SOR")
+sor_frq <- full_join(sor_frq, sor_hospitals %>% select(unit_SOR), by="unit_SOR") %>%
+  left_join(sor_type %>% select(unit_SOR, Type), by="unit_SOR") %>%
+  ## Looking at old records shows the 45 or so non+matching were not psyk:
+  replace_na(list(Type = "somatisk"))
 
 
 ### Then extract relevant information from the database:
@@ -76,8 +103,8 @@ with(NoGIScsv, range(Easting, na.rm=TRUE))
 with(NoGIScsv, range(Northing, na.rm=TRUE))
 
 ### Then join, and use the database first and CSV file if database is missing:
-SORcombined <- full_join(sor_db, SORcsv, by=c("unit_SOR")) %>%
-  full_join(NoGIScsv, by=c("unit_SOR")) %>%
+SORcombined <- full_join(sor_db, SORcsv, by=c("unit_SOR","Type")) %>%
+  full_join(NoGIScsv, by=c("unit_SOR","Type")) %>%
   mutate(UnitName = case_when(
     !is.na(UnitName) ~ UnitName,
     TRUE ~ UnitName_db
@@ -103,7 +130,7 @@ SORcombined <- full_join(sor_db, SORcsv, by=c("unit_SOR")) %>%
     !is.na(Northing) ~ Northing,
     TRUE ~ NA_real_
   )) %>%
-  select(unit_SOR, Region, n, UnitName, OwnerType, SundhedsinstitutionNavn, Easting, Northing, OphoertDato, FraDato) %>%
+  select(unit_SOR, Type, Region, n, UnitName, OwnerType, SundhedsinstitutionNavn, Easting, Northing, OphoertDato, FraDato) %>%
   mutate(HasGIS = !(is.na(Easting) | is.na(Northing)))
 
 sor_missing <- SORcombined %>%
@@ -243,11 +270,13 @@ final_hospital <- sor_hospitals %>%
   count(HospitalID) %>%
   arrange(desc(n))
 
-## TODO: add unit type e.g. OutPatient, InPatient, Radiology, or by Speciality, or something:
+
 sor_hospitals <- sor_hospitals %>%
-  mutate(Type = "Unknown") %>%
+  left_join(sor_frq %>% select(unit_SOR, Type), by="unit_SOR") %>%
   mutate(HospitalName = HospitalID) %>%
   mutate(HospitalID = as.integer(factor(HospitalName)), HospitalID = str_c("Hospital_", str_replace_all(format(HospitalID), " ", "0")))
+
+stopifnot(all(sor_hospitals$Type %in% c("somatisk","psykiatrisk")))
 
 if(TRUE){
   writexl::write_xlsx(list(sor_hospitals=sor_hospitals, final_hospital=final_hospital), str_c("G:/PhD/Sygehus klassifikation/sor_hospitals_", strftime(Sys.Date(), "%Y%m%d"), ".xlsx"))

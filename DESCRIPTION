@@ -17,7 +17,8 @@ Imports:
     RODBC,
     odbc,
     keyring,
-    Rcpp
+    Rcpp,
+    stringr
 Suggests: 
     knitr,
     rmarkdown,
