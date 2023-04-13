@@ -134,18 +134,21 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, risk_function = NULL, ou
             collect() %>%
             pull(rows)
           ## TODO:  rules for min rows
-          if(nrows1 <= 0L){
+          if(nrows1 <= 100L){
             stop(paste0("Too few (", nrows1, ") rows in database"))
           }
 
           Sys.sleep(timeout[1L]*60L)
-          nrows2 <- contacts_using %>%
-            summarise(rows = n()) %>%
-            collect() %>%
-            pull(rows)
-          if(nrows1 != nrows2){
-            stop("Unstable number of rows in the database")
-          }
+          
+          # Removed second row count as it is unnecessary
+          # (nrow of the collected data is checked below)
+          #nrows2 <- contacts_using %>%
+          #  summarise(rows = n()) %>%
+          #  collect() %>%
+          #  pull(rows)
+          #if(nrows1 != nrows2){
+          #  stop("Unstable number of rows in the database")
+          #}
         }
 
         contacts_using <- contacts_using %>% collect()
