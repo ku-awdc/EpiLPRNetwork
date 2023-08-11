@@ -2,13 +2,27 @@
 #'
 #' @import stringr
 #'
+#' @examples
+#' /dontrun{
+#' data(sor_hospitals)
+#' sor_hospitals$Type <- "Whatever"
+#' get_edges(sor_hosspitals = sor_hospitals)
+#' }
+#'
+#' results <- get_edges(sor_hosspitals = NULL)
+#' res$risk |> filter(HospitalTo != HospitalFrom)
+#'
 #' @export
-get_edges <- function(all_by_mth = NA, year_group=TRUE, risk_function = NULL, output_level = "month",
+get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
+                      risk_function = NULL, output_level = "month",
                       max_date = "2019-01-01 00:00", retry=Inf, timeout=c(1,5,15,60), testing=FALSE){
 
   # all_by_mth = NA; risk_function = NULL; output_level = "month"; max_date = "2022-01-01 00:00"; year_group=TRUE
 
-  data(sor_hospitals)
+  if(is.null(sor_hospitals)){
+    data(sor_hospitals, envir=environment())
+    stopifnot(is.data.frame(sor_hospitals))
+  }
 
   stopifnot(output_level %in% c("month","day"))
 
@@ -139,7 +153,7 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, risk_function = NULL, ou
           }
 
           Sys.sleep(timeout[1L]*60L)
-          
+
           # Removed second row count as it is unnecessary
           # (nrow of the collected data is checked below)
           #nrows2 <- contacts_using %>%
@@ -292,7 +306,7 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, risk_function = NULL, ou
 
   cat("Done\n")
 
-  return(list(risk=allrisk, hospital=allhosp))
+  return(list(risk=allrisk, hospital=allhosp, sor_hospitals=sor_hospitals))
 
 }
 
