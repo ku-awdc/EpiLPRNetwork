@@ -5,10 +5,10 @@ library("EpiLPRNetwork")
 ## To remove type i.e. for comparing with old runs:
 data(sor_hospitals)
 sor_hospitals$Type <- "Whatever"
-output_no_type <- get_edges(all_by_mth = "63", sor_hospitals = sor_hospitals)
+output_no_type <- EpiLPRNetwork::get_edges(all_by_mth = "63", sor_hospitals = sor_hospitals)
 using <- output_no_type$risk
 
-output_with_type <- get_edges(all_by_mth = "43", sor_hospitals = NULL)
+output_with_type <- get_edges( sor_hospitals = NULL)
 using <- output_with_type$risk |> filter(HospitalTo != HospitalFrom)
 
 
@@ -77,17 +77,33 @@ for(y in names(output)){
     output[[y]]
 }
 
-output[[1]] |>
+output |>
   group_by(Type, Region, Year) |>
   summarise(TotalRisk = sum(TotalRisk), N = n(), .groups="drop") |>
   ggplot(aes(x=Year, y=TotalRisk, col=Type, group=Type)) +
   geom_line() +
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
   facet_wrap(~Region)
+
+out_long <- ldply(output)
+out_long <- out_long %>% group_by(Year, Region, Type) %>% dplyr::summarise(TotalRisk = sum(TotalRisk),N=n(), .groups="drop")
+ggplot(out_long,aes(x=Year, y=TotalRisk, col=Type, group=Type)) +
+  geom_line() +
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
+  facet_wrap(~Region)
+
+out_long <- ldply(output)
+out_long <- out_long %>% filter(Region=="Transfer")%>%
+  group_by(Type, RegionTo, RegionFrom, Year) %>% dplyr::summarise(TotalRisk = sum(TotalRisk),N=n(), .groups="drop")
+ggplot(out_long,aes(x=Year, y=TotalRisk, col=Type, group=Type)) +
+  geom_line() +
+  scale_x_discrete(guide = guide_axis(angle = 90)) +
+  facet_grid(RegionFrom~RegionTo)
 
 output[[1]] |>
   filter(Region=="Transfer") |>
   group_by(Type, RegionTo, RegionFrom, Year) |>
-  summarise(TotalRisk = sum(TotalRisk), N = n(), .groups="drop") |>
+  dplyr::summarise(TotalRisk = sum(TotalRisk), N = n(), .groups="drop") |>
   ggplot(aes(x=Year, y=TotalRisk, col=Type, group=Type)) +
   geom_line() +
   facet_grid(RegionFrom~RegionTo)

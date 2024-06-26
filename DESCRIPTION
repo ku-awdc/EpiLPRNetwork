@@ -1,12 +1,17 @@
 Package: EpiLPRNetwork
 Title: What the Package Does (One Line, Title Case)
-Version: 0.2.0-2
-Date: 2023-04-13
+Version: 0.2.1-2
+Date: 2024-03-12
 Authors@R: 
-    person(given = "Matt",
-           family = "Denwood",
+    c(person(given = "Anna",
+           family = "Henius",
            role = c("aut", "cre"),
+           email = "aneh@ssi.dk"),
+      person(given = "Matt",
+           family = "Denwood",
+           role = c("aut"),
            email = "md@sund.ku.dk")
+      )
 Description: What the package does (one paragraph).
 License: GPL (>= 3)
 Encoding: UTF-8

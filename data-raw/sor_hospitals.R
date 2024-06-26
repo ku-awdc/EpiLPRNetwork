@@ -11,6 +11,8 @@ library(fpc)
 contacts <- get_sql_table("contacts")
 sor <- get_sql_table("sor")
 
+contacts %>% mutate(Year = year(contact_in)) %>% dplyr::count(Year) %>% collect() -> rowsLPR
+
 
 SOREntity_daily_file <- "G:/PhD/Sygehus klassifikation/Nyeste SOR/SOREntity_daily.csv"
 if(!file.exists(SOREntity_daily_file)) stop("SOREntity_daily file not found")
@@ -47,7 +49,7 @@ sor_type %>% count(Type, psyk_navn, psyk_speciale)
 
 ### First extract all SOR used in contacts:
 contacts %>%
-  filter(contact_in<"2019-01-01 00:00") %>%
+  filter(contact_in<"2024-01-01 00:00") %>%
   count(unit_SOR) %>%
   collect() %>%
   identity() %>%
@@ -278,10 +280,81 @@ sor_hospitals <- sor_hospitals %>%
 
 stopifnot(all(sor_hospitals$Type %in% c("somatisk","psykiatrisk")))
 
+
+## Add Sundhedsinstitution
+get_sql_table("sor") |>
+  collect() |>
+  select(unit_SOR = SorIdentifier, Sundhedsinstitution) |>
+  mutate(unit_SOR = as.character(unit_SOR)) |>
+  inner_join(
+    sor_hospitals |> filter(!is.na(Latitude)),
+    by = join_by(unit_SOR)
+  ) |>
+  count(Sundhedsinstitution, Latitude, Longitude) |>
+  group_by(Latitude, Longitude) |>
+  arrange(desc(n)) |>
+  slice(1L) |>
+  ungroup() |>
+  arrange(desc(n)) ->
+  hosp_gps
+
+sor_hospitals |>
+  left_join(
+    hosp_gps |> select(-n),
+    by= join_by(Latitude, Longitude)
+  ) ->
+  sor_hospitals
+
 if(TRUE){
-  writexl::write_xlsx(list(sor_hospitals=sor_hospitals, final_hospital=final_hospital), str_c("G:/PhD/Sygehus klassifikation/sor_hospitals_", strftime(Sys.Date(), "%Y%m%d"), ".xlsx"))
+  writexl::write_xlsx(list(sor_hospitals=sor_hospitals, final_hospital=final_hospital), str_c("C:/Users/b245856/Documents/GitHub/EpiLPRNetwork/data/sor_hospitals_", strftime(Sys.Date(), "%Y%m%d"), ".xlsx"))
 }
 
+sor_hospitals |>
+  mutate(HospitalManual = case_when(
+    floor(Northing_use) == 6178009 & floor(Easting_use) == 724134 ~ "Riget",
+    floor(Northing_use) == 6228057 & floor(Easting_use) == 572737 ~ "Aarhus",
+    floor(Northing_use) == 6172451 & floor(Easting_use) == 718347 ~ "Hvidovre",
+    floor(Northing_use) == 6321885 & floor(Easting_use) == 555079 ~ "Aalborg",
+    floor(Northing_use) == 6138452 & floor(Easting_use) == 586774 ~ "OdenseA",
+    floor(Northing_use) == 6138341 & floor(Easting_use) == 586723 ~ "OdenseB",
+    floor(Northing_use) == 6152465 & floor(Easting_use) == 700073 ~ "K\u00f8ge",  # stringi::stri_escape_unicode("Køge")
+    floor(Northing_use) == 6181507 & floor(Easting_use) == 716209 ~ "Herlev",
+    floor(Northing_use) == 6169983 & floor(Easting_use) == 694514 ~ "Roskilde",
+    floor(Northing_use) == 6182724 & floor(Easting_use) == 722479 ~ "Gentofte",
+    floor(Northing_use) == 6141950 & floor(Easting_use) == 649996 ~ "Slagelse",
+    floor(Northing_use) == 6179730 & floor(Easting_use) == 722481 ~ "Bispebjerg",
+    floor(Northing_use) == 6203426 & floor(Easting_use) == 707711 ~ "Hiller\u00f8d",
+    floor(Northing_use) == 6255764 & floor(Easting_use) == 524950 ~ "Viborg",
+    .default = NA_character_
+  )) |>
+  count(HospitalManual, HospitalID) |>
+  filter(!is.na(HospitalManual)) ->
+  hosp_manual
+
+hosp_manual |>
+  arrange(HospitalID) |>
+  print(n=Inf)
+
+hosp_manual |>
+  mutate(HospitalManual = case_when(
+    HospitalManual %in% c("Bispebjerg", "Riget") ~ "Rig-Bisp",
+    str_detect(HospitalManual, "Odense") ~ "Odense",
+    .default=HospitalManual
+  )) |>
+  group_by(HospitalID, HospitalManual) |>
+  summarise(.groups="drop") ->
+  hosp_manual
+
+sor_hospitals |>
+  full_join(
+    hosp_manual, by="HospitalID"
+  ) |>
+  mutate(HospitalID = if_else(is.na(HospitalManual), HospitalID, HospitalManual)) ->
+  sor_hospitals
+
+sor_hospitals |>
+  count(HospitalManual) |>
+  print(n=20)
 
 usethis::use_data(sor_hospitals, overwrite = TRUE)
 
