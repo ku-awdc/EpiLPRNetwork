@@ -46,7 +46,7 @@ sor %>%
     .default="No"
   )) ->
   risk_sor
-data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABgAAAASCAYAAABB7B6eAAABDklEQVR4Xp2UMaoCMRRFFcHCxsrO0tba/i/ADfwV/A2ICFYW7kAY/CSZOGYgnVjbW9taugFbG8f3OpO5A3lzIFh4Dg4ON53VelPp3NWOsW7R+SLVq1FVVbchfhtz/JV6EO99vyF+Ket+pB4ky/ywIX5qXUylHmRfFGMUm9w9+DupB/k/HCY4Lu9K+ZHUgyhbzlBM55pl54HUgxhTzlGscneil92TehBljn9xyMfYctfGq0HSMo748BO38QJ4PCS9UcSjk3oBPBqSXijisUm9AB6L5tGAiEcm9QJ4JDwWFMVDS/EC+FdJuqEovipSvAD+v0i6oCi+7FK8AH7T2roCRfF1neLVIGmLIvpctvFiPtxv6UGYMompAAAAAElFTkSuQmCC
+
 stopifnot(all(sor_frq$unit_SOR %in% risk_sor$unit_SOR))
 
 risk_sor |> count(HighRisk, HospitalID)
