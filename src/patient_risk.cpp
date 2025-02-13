@@ -2,7 +2,7 @@
 
 #include "patient_risk.hpp"
 
-Rcpp::DataFrame patient_risk(const Rcpp::DataFrame& input, const bool within_hosp)
+Rcpp::DataFrame patient_risk(Rcpp::DataFrame input, const bool within_hosp)
 {
   Rcpp::DataFrame rv;
 

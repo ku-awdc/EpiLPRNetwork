@@ -1,7 +1,7 @@
 #include <Rcpp.h>
 
 template <bool T_within_hosp>
-Rcpp::DataFrame patient_risk_template(const Rcpp::DataFrame& input)
+Rcpp::DataFrame patient_risk_template(Rcpp::DataFrame input)
 {
   using namespace Rcpp;
 
@@ -152,4 +152,4 @@ Rcpp::DataFrame patient_risk_template(const Rcpp::DataFrame& input)
   return temp;
 }
 
-Rcpp::DataFrame patient_risk(const Rcpp::DataFrame& input, const bool within_hosp = false);
+Rcpp::DataFrame patient_risk(Rcpp::DataFrame input, const bool within_hosp = false);

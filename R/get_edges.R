@@ -1,6 +1,7 @@
 #' Title
 #'
 #' @import stringr
+#' @importFrom lubridate ceiling_date
 #'
 #' @examples
 #' /dontrun{
@@ -15,7 +16,8 @@
 #' @export
 get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
                       risk_function = NULL, output_level = "month",
-                      max_date = "2019-01-01 00:00", retry=Inf, timeout=c(1,5,15,60), testing=FALSE){
+                      min_date = "2005-01-01 00:00", max_date = "2019-01-01 00:00",
+                      retry=Inf, timeout=c(1,5,15,60), testing=FALSE){
 
   # all_by_mth = NA; risk_function = NULL; output_level = "month"; max_date = "2022-01-01 00:00"; year_group=TRUE
 
@@ -56,7 +58,7 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
   contacts <- get_sql_table("contacts")
   contacts %>%
     # filter(contact_in<"2022-01-01 00:00") %>%
-    filter(contact_in < max_date) %>%
+    filter(contact_out >= min_date, contact_in < max_date) %>%
     count(unit_SOR) %>%
     collect() %>%
     identity() %>%
@@ -143,12 +145,12 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
 
         if(year_group){
           contacts_using <- contacts %>%
-            filter(contact_in < max_date) %>%
+            filter(contact_out >= min_date, contact_in < max_date) %>%
             filter(cprnr %LIKE% str_c("____", by, "%")) %>%
             select(cprnr, unit_SOR, contact_in, contact_out)
         }else{
           contacts_using <- contacts %>%
-            filter(contact_in < max_date) %>%
+            filter(contact_out >= min_date, contact_in < max_date) %>%
             filter(cprnr %LIKE% str_c("__", by, "%")) %>%
             select(cprnr, unit_SOR, contact_in, contact_out)
         }
@@ -274,18 +276,31 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
       stop("Unrecognised output_level")
     }
 
+    ## Get unique time units:
+    tibble(
+      Date = seq(as.Date(min_date), as.Date(max_date), by=1L)
+    ) |>
+      mutate(TimeUnit = aggfun(Date)) |>
+      distinct(TimeUnit) |>
+      mutate(TimeMin = as.POSIXct(str_c(TimeUnit,"-01 00:00:00", tz="Europe/Copenhagen"))) |>
+      mutate(TimeMax = ceiling_date(TimeMin, unit="month", change_on_boundary=TRUE)) ->
+      time_units
+
     ## Aggregate to time unit:
     trisk <- bind_cols(trisk,
       tibble(TRISK=trisk) %>% mutate(across(TRISK, risk_function, .names="Risk{.fn}")) %>% select(-TRISK)
       ) %>%
-      mutate(Risk = calculate_risk(Admission, Discharge, Type, OldAdmission, OldDischarge, OldType, as.numeric(str_sub(cprnr, start=5L, end=6L)))) %>%
+      ## mutate(Risk = calculate_risk(Admission, Discharge, Type, OldAdmission, OldDischarge, OldType, as.numeric(str_sub(cprnr, start=5L, end=6L)))) %>%
       mutate(TimeUnit = aggfun(Admission)) %>%
       group_by(TimeUnit, HospitalID, Type, OldHospital, OldType) %>%
       summarise(TotalRisk = sum(Risk), .groups='drop') %>%
       filter(TotalRisk > 0.0) %>%
       select(TimeUnit, HospitalTo=HospitalID, TypeTo=Type, HospitalFrom=OldHospital, TypeFrom=OldType, TotalRisk)
 
-    ## Calculate patient days in hospital:
+    ## Calculate number of patient hours within each time period:
+    tindlagt <- antal_indlagt(admissions_using, time_units)
+
+    ## Calculate patient info for admissions starting (but not necessarily ending) in this time period:
     thosp <- admissions_using %>%
       mutate(AdmissionHours = as.numeric(Discharge - Admission, units="hours")) %>%
       mutate(AdmissionNights = as.numeric(as.Date(Discharge)-as.Date(Admission), units="days")) %>%
@@ -299,9 +314,11 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
     if(by==all_by_mth[1]){
       allrisk <- trisk
       allhosp <- thosp
+      allindlagt <- tindlagt
     }else{
       allrisk <- bind_rows(allrisk, trisk)
       allhosp <- bind_rows(allhosp, thosp)
+      allindlagt <- bind_rows(allindlagt, tindlagt)
     }
 
     allrisk <- allrisk %>%
@@ -314,13 +331,19 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
       summarise_if(is.numeric, sum) %>%
       ungroup()
 
+    allindlagt <- allindlagt %>%
+      group_by(TimeUnit, HospitalID, Type) %>%
+      # summarise(across(where(is.numeric), sum), .groups="drop")
+      summarise_if(is.numeric, sum) %>%
+      ungroup()
+
     cat(" finished in ", round(as.numeric(Sys.time()-st, units="mins"), 1), " minutes.\n", sep="")
 
   }
 
   cat("Done\n")
 
-  return(list(risk=allrisk, hospital=allhosp, sor_hospitals=sor_hospitals))
+  return(list(risk=allrisk, hospital=allhosp, indlagt=allindlagt, sor_hospitals=sor_hospitals))
 
 }
 

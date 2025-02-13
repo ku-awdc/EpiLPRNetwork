@@ -7,8 +7,10 @@
 get_edges(
   all_by_mth = NA,
   year_group = TRUE,
+  sor_hospitals = NULL,
   risk_function = NULL,
   output_level = "month",
+  min_date = "2005-01-01 00:00",
   max_date = "2019-01-01 00:00",
   retry = Inf,
   timeout = c(1, 5, 15, 60),
@@ -17,4 +19,15 @@ get_edges(
 }
 \description{
 Title
+}
+\examples{
+/dontrun{
+data(sor_hospitals)
+sor_hospitals$Type <- "Whatever"
+get_edges(sor_hosspitals = sor_hospitals)
+
+results <- get_edges(sor_hosspitals = NULL)
+res$risk |> filter(HospitalTo != HospitalFrom)
+}
+
 }
