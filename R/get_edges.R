@@ -7,10 +7,10 @@
 #' data(sor_hospitals)
 #' sor_hospitals$Type <- "Whatever"
 #' get_edges(sor_hosspitals = sor_hospitals)
-#' }
 #'
 #' results <- get_edges(sor_hosspitals = NULL)
 #' res$risk |> filter(HospitalTo != HospitalFrom)
+#' }
 #'
 #' @export
 get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
@@ -77,15 +77,27 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
 
 
   if(is.null(risk_function)){
-    # Function to relate hospitalisation risk based on delta time:
-    # Note: should be vectorised!!!
-    calculate_risk <- function(new_admission, new_discharge, new_type, old_admission, old_discharge, old_type, birth_year){
-      case_when (as.numeric(new_admission-old_discharge, units="days")>30 ~ 0.0, TRUE ~ 1
-      )
-    }
+    # One or more functions to relate hospitalisation risk based on delta time:
+    risk_function <- list(
+      # NOTE: argument has now changed to a data frame, with the following columns:
+      # new_admission, new_discharge, new_type, old_admission, old_discharge, old_type, birth_year
+      Flat_30 = function(df){
+        if_else(as.numeric(df[["new_admission"]]-df[["old_discharge"]], units="days")<=30, 1.0, 0.0)
+      },
+      Exp_30 = function(df){
+        dtime <- as.numeric(df[["new_admission"]]-df[["old_discharge"]], units="days")
+        if_else(dtime <= 150, 1.0 - pexp(dtime, rate=1/30), 0.0)
+      }
+    )
+  }
 
+  if(is.function(risk_function)){
+    ## Allow single non-named function:
+    risk_function <- list(Calc=risk_function)
   }else{
-    calculate_risk <- risk_function
+    ## Otherwise all functions must be named:
+    stopifnot(!is.null(names(risk_function)), !is.na(names(risk_function)), names(risk_function)!="")
+    stopifnot(sapply(risk_function, is.function))
   }
 
   #  contact_head <- contacts %>% head() %>% collect()
@@ -263,7 +275,9 @@ get_edges <- function(all_by_mth = NA, year_group=TRUE, sor_hospitals = NULL,
     }
 
     ## Aggregate to time unit:
-    trisk <- trisk %>%
+    trisk <- bind_cols(trisk,
+      tibble(TRISK=trisk) %>% mutate(across(TRISK, risk_function, .names="Risk{.fn}")) %>% select(-TRISK)
+      ) %>%
       mutate(Risk = calculate_risk(Admission, Discharge, Type, OldAdmission, OldDischarge, OldType, as.numeric(str_sub(cprnr, start=5L, end=6L)))) %>%
       mutate(TimeUnit = aggfun(Admission)) %>%
       group_by(TimeUnit, HospitalID, Type, OldHospital, OldType) %>%
